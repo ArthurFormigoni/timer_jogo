@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Desafio do Cronômetro | Street Buzzer</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #000000;
+      --led-green: #00ff66;
+      --led-green-dim: rgba(0, 255, 102, 0.12);
+      --led-green-glow: rgba(0, 255, 102, 0.45);
+      --led-off: rgba(0, 255, 102, 0.08);
+      
+      --casing: #0d120e;
+      --casing-border: #1a291e;
+      
+      --font-led: 'Orbitron', monospace;
+      --font-ui: 'Space Grotesk', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      background: var(--bg);
+      color: #ffffff;
+      font-family: var(--font-ui);
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: clamp(14px, 2.5vh, 28px) 16px;
+      padding-top: max(clamp(14px, 2.5vh, 28px), env(safe-area-inset-top));
+      padding-bottom: max(clamp(14px, 2.5vh, 28px), env(safe-area-inset-bottom));
+    }
+
+    /* Tablet & Mobile Shell */
+    .table-stand {
+      width: 100%;
+      max-width: 480px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+
+    /* Target Selector Bar */
+    .target-bar {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .target-bar-label {
+      font-family: var(--font-led);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: var(--led-green);
+      text-transform: uppercase;
+      opacity: 0.85;
+    }
+
+    .target-selector {
+      display: flex;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .btn-target {
+      flex: 1;
+      height: 42px;
+      background: #080c09;
+      border: 1px solid var(--casing-border);
+      border-radius: 10px;
+      color: #557760;
+      font-family: var(--font-led);
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-target.active {
+      background: var(--led-green-dim);
+      border-color: var(--led-green);
+      color: var(--led-green);
+      box-shadow: 0 0 12px var(--led-green-dim);
+    }
+
+    .btn-target:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    /* Digital LED Stopwatch Box (Exact Look from the Street Challenge) */
+    .led-display-casing {
+      width: 100%;
+      background: #060907;
+      border: 3px solid #142217;
+      border-radius: 18px;
+      padding: clamp(12px, 2vh, 18px) 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.9), inset 0 0 20px rgba(0, 0, 0, 0.8), 0 0 15px rgba(0, 255, 102, 0.08);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Beveled Screws in corners for realistic hardware look */
+    .led-display-casing::before,
+    .led-display-casing::after {
+      content: '';
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background: #1e3324;
+      border-radius: 50%;
+    }
+    .led-display-casing::before { top: 8px; left: 10px; }
+    .led-display-casing::after { top: 8px; right: 10px; }
+
+    .led-status-line {
+      font-family: var(--font-led);
+      font-size: clamp(0.72rem, 2vw, 0.85rem);
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      min-height: 18px;
+      white-space: nowrap;
+    }
+
+    .led-status-line.won {
+      color: var(--led-green);
+      text-shadow: 0 0 12px var(--led-green);
+    }
+
+    .led-status-line.lost {
+      color: #ffffff;
+      opacity: 0.45;
+    }
+
+    .led-digits-wrapper {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    /* Active Glowing LED Digits - Scaled to never overflow casing */
+    .led-digits {
+      font-family: var(--font-led);
+      font-size: clamp(2rem, 6.8vw, 3.2rem);
+      font-weight: 900;
+      letter-spacing: 1px;
+      color: var(--led-green);
+      text-shadow: 0 0 14px var(--led-green), 0 0 28px var(--led-green-glow);
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      text-align: center;
+    }
+
+    .led-subinfo {
+      font-family: var(--font-led);
+      font-size: clamp(0.62rem, 1.7vw, 0.74rem);
+      letter-spacing: 1.2px;
+      color: #557760;
+      min-height: 18px;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      max-width: 100%;
+      text-align: center;
+    }
+
+    .led-subinfo.won {
+      color: var(--led-green);
+    }
+
+    /* ==========================================================================
+       THE PHYSICAL ARCADE BUZZER DOME (SLAMMABLE TABLET BUTTON)
+       ========================================================================== */
+    .buzzer-stage {
+      flex: 1;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      padding: 10px 0;
+    }
+
+    /* Outer Heavy Base Rim of the Buzzer on the Table */
+    .buzzer-base {
+      width: clamp(230px, 58vw, 300px);
+      height: clamp(230px, 58vw, 300px);
+      border-radius: 50%;
+      background: radial-gradient(circle, #1a221c 0%, #0d120e 70%, #050806 100%);
+      box-shadow: 
+        0 20px 45px rgba(0, 0, 0, 0.95),
+        0 6px 0 #050806,
+        inset 0 2px 4px rgba(255, 255, 255, 0.15),
+        inset 0 -3px 8px rgba(0, 0, 0, 0.9);
+      border: 3px solid #1c2e21;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.08s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+    }
+
+    /* Inner Metallic Bezel Ring */
+    .buzzer-bezel {
+      width: 86%;
+      height: 86%;
+      border-radius: 50%;
+      background: radial-gradient(circle at 45% 35%, #2a3d2e 0%, #111a13 65%, #080d09 100%);
+      border: 2px solid #00ff66;
+      box-shadow: 
+        inset 0 4px 10px rgba(0, 0, 0, 0.8),
+        0 0 16px rgba(0, 255, 102, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    /* The Elevated 3D Acrylic Dome Cap (The Physical Slam Button) */
+    .buzzer-cap {
+      width: 80%;
+      height: 80%;
+      border-radius: 50%;
+      background: radial-gradient(circle at 40% 32%, #4dff99 0%, #00cc52 40%, #006629 85%, #003314 100%);
+      box-shadow: 
+        0 14px 22px rgba(0, 0, 0, 0.85),
+        0 8px 0 #004d1f,
+        inset 0 4px 10px rgba(255, 255, 255, 0.4),
+        inset 0 -6px 12px rgba(0, 30, 10, 0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      transform: translateY(-5px);
+      transition: transform 0.06s ease, box-shadow 0.06s ease, filter 0.06s ease;
+      cursor: pointer;
+    }
+
+    /* Top Specular Dome Reflection */
+    .buzzer-cap::before {
+      content: '';
+      position: absolute;
+      top: 10%;
+      left: 18%;
+      width: 64%;
+      height: 38%;
+      border-radius: 50% 50% 40% 40%;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0) 100%);
+      pointer-events: none;
+    }
+
+    /* Heavy Embossed Typography on the Dome */
+    .buzzer-text {
+      font-family: var(--font-led);
+      font-size: clamp(1.4rem, 4vw, 1.9rem);
+      font-weight: 900;
+      letter-spacing: 2px;
+      color: #031408;
+      text-transform: uppercase;
+      text-shadow: 0 1px 1px rgba(255, 255, 255, 0.4), 0 -1px 1px rgba(0, 0, 0, 0.7);
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .buzzer-subtext {
+      font-family: var(--font-ui);
+      font-size: clamp(0.65rem, 1.8vw, 0.78rem);
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: rgba(3, 20, 8, 0.85);
+      text-transform: uppercase;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    /* SLAMMED DOWN MECHANICAL ACTIVE STATE (When you press or hit it) */
+    .buzzer-base:active .buzzer-cap,
+    .buzzer-cap.pressed {
+      transform: translateY(3px) scale(0.97);
+      box-shadow: 
+        0 4px 10px rgba(0, 0, 0, 0.85),
+        0 2px 0 #004d1f,
+        inset 0 2px 8px rgba(0, 0, 0, 0.6),
+        inset 0 4px 6px rgba(0, 255, 102, 0.3);
+      filter: brightness(1.15);
+    }
+
+    .buzzer-base:active {
+      transform: scale(0.985);
+    }
+
+    /* State Specific Styling */
+    .buzzer-base.state-running .buzzer-cap {
+      background: radial-gradient(circle at 40% 32%, #70ffad 0%, #00ff66 45%, #00993d 85%, #004d1f 100%);
+      box-shadow: 
+        0 14px 22px rgba(0, 0, 0, 0.85),
+        0 8px 0 #006629,
+        0 0 35px rgba(0, 255, 102, 0.55),
+        inset 0 4px 10px rgba(255, 255, 255, 0.6);
+    }
+
+    /* Keyboard / Tablet Slam Hint */
+    .bottom-hint {
+      font-family: var(--font-led);
+      font-size: 0.65rem;
+      letter-spacing: 1.5px;
+      color: #3b5543;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+
+  <main class="table-stand">
+
+    <!-- Top Target Picker -->
+    <header class="target-bar">
+      <div class="target-bar-label">Escolha o Alvo</div>
+      <div class="target-selector" id="target-selector">
+        <button class="btn-target" data-sec="3">3.00s</button>
+        <button class="btn-target active" data-sec="5">5.00s</button>
+        <button class="btn-target" data-sec="7">7.00s</button>
+        <button class="btn-target" data-sec="10">10.00s</button>
+      </div>
+    </header>
+
+    <!-- Digital LED Stopwatch Box -->
+    <section class="led-display-casing" id="led-casing" aria-live="polite">
+      <div class="led-status-line" id="led-status">PRONTO</div>
+      
+      <div class="led-digits-wrapper">
+        <div class="led-digits" id="led-digits">05:00.00</div>
+      </div>
+
+      <div class="led-subinfo" id="led-subinfo">TOQUE NO BOTÃO PARA INICIAR</div>
+    </section>
+
+    <!-- Real Arcade Slam Buzzer for Tablet Touch -->
+    <div class="buzzer-stage">
+      <div class="buzzer-base" id="buzzer-base" role="button" tabindex="0" aria-label="Botão Buzzer">
+        <div class="buzzer-bezel">
+          <div class="buzzer-cap" id="buzzer-cap">
+            <span class="buzzer-text" id="buzzer-main-text">START</span>
+            <span class="buzzer-subtext" id="buzzer-sub-text">BATER</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Minimal Tablet / Desk Hint -->
+    <footer class="bottom-hint">
+      Toque no Buzzer ou aperte Espaço
+    </footer>
+
+  </main>
+
+  <script>
+    (function() {
+      let targetSec = 5;
+      let state = 'IDLE'; // 'IDLE' | 'RUNNING' | 'RESULT'
+      let startTime = 0;
+
+      // DOM
+      const targetButtons = document.querySelectorAll('.btn-target');
+      const buzzerBase = document.getElementById('buzzer-base');
+      const buzzerCap = document.getElementById('buzzer-cap');
+      const buzzerMainText = document.getElementById('buzzer-main-text');
+      const buzzerSubText = document.getElementById('buzzer-sub-text');
+
+      const ledStatus = document.getElementById('led-status');
+      const ledDigits = document.getElementById('led-digits');
+      const ledSubinfo = document.getElementById('led-subinfo');
+
+      // Realistic Synthesizer Audio (Click, Relay Snap, Buzzer Hit)
+      let audioCtx = null;
+      function getAudio() {
+        if (!audioCtx) {
+          const AC = window.AudioContext || window.webkitAudioContext;
+          if (AC) audioCtx = new AC();
+        }
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        return audioCtx;
+      }
+
+      function playRelayClick() {
+        const ctx = getAudio();
+        if (!ctx) return;
+        try {
+          // Sharp mechanical microswitch click
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(800, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.03);
+          gain.gain.setValueAtTime(0.3, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.03);
+        } catch (e) {}
+      }
+
+      function playWinBuzzer() {
+        const ctx = getAudio();
+        if (!ctx) return;
+        try {
+          // High pitch victory chime
+          [880, 1174, 1760].forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, ctx.currentTime + (idx * 0.07));
+            gain.gain.setValueAtTime(0.25, ctx.currentTime + (idx * 0.07));
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + (idx * 0.07) + 0.22);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(ctx.currentTime + (idx * 0.07));
+            osc.stop(ctx.currentTime + (idx * 0.07) + 0.22);
+          });
+        } catch (e) {}
+      }
+
+      function playLoseSound() {
+        const ctx = getAudio();
+        if (!ctx) return;
+        try {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(220, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(110, ctx.currentTime + 0.25);
+          gain.gain.setValueAtTime(0.2, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.25);
+        } catch (e) {}
+      }
+
+      function hapticSlam() {
+        if ('vibrate' in navigator) {
+          try { navigator.vibrate([25, 40, 25]); } catch (e) {}
+        }
+      }
+
+      // Format time as mm:ss.ms (e.g. 05:00.00)
+      function formatLed(sec) {
+        const totalMs = Math.round(sec * 100);
+        const ms = totalMs % 100;
+        const totalSecs = Math.floor(sec);
+        const s = totalSecs % 60;
+        const m = Math.floor(totalSecs / 60);
+
+        const mmStr = String(m).padStart(2, '0');
+        const ssStr = String(s).padStart(2, '0');
+        const msStr = String(ms).padStart(2, '0');
+        return `${mmStr}:${ssStr}.${msStr}`;
+      }
+
+      // Target selection
+      targetButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (state !== 'IDLE') return;
+          playRelayClick();
+          targetSec = parseInt(btn.dataset.sec, 10);
+          targetButtons.forEach(b => b.classList.toggle('active', b === btn));
+          ledDigits.textContent = formatLed(targetSec);
+        });
+      });
+
+      // Buzzer Slam triggers
+      buzzerBase.addEventListener('pointerdown', () => {
+        buzzerCap.classList.add('pressed');
+      });
+      window.addEventListener('pointerup', () => {
+        buzzerCap.classList.remove('pressed');
+      });
+
+      buzzerBase.addEventListener('click', handleSlam);
+
+      window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' || e.code === 'Enter') {
+          e.preventDefault();
+          buzzerCap.classList.add('pressed');
+          handleSlam();
+          setTimeout(() => buzzerCap.classList.remove('pressed'), 120);
+        }
+      });
+
+      function handleSlam() {
+        if (state === 'IDLE') {
+          startTimer();
+        } else if (state === 'RUNNING') {
+          stopTimer();
+        } else if (state === 'RESULT') {
+          resetTimer();
+        }
+      }
+
+      function startTimer() {
+        state = 'RUNNING';
+        startTime = performance.now();
+        playRelayClick();
+        hapticSlam();
+
+        // UI Updates
+        buzzerBase.classList.add('state-running');
+        buzzerMainText.textContent = 'STOP';
+        buzzerSubText.textContent = 'PARAR';
+
+        // Hidden Countdown Display (Classic Street Challenge)
+        ledStatus.textContent = 'CONTAGEM OCULTA';
+        ledStatus.className = 'led-status-line';
+        ledDigits.textContent = '--:--.--';
+        ledSubinfo.textContent = `ALVO: ${formatLed(targetSec)} | BATA NO TEMPO!`;
+        ledSubinfo.className = 'led-subinfo';
+
+        targetButtons.forEach(b => b.disabled = true);
+      }
+
+      function stopTimer() {
+        const elapsed = (performance.now() - startTime) / 1000;
+        state = 'RESULT';
+        playRelayClick();
+        hapticSlam();
+
+        buzzerBase.classList.remove('state-running');
+        buzzerMainText.textContent = 'RESET';
+        buzzerSubText.textContent = 'DE NOVO';
+
+        const diff = Math.abs(elapsed - targetSec);
+        const won = diff <= 0.15; // Ganha apenas com ate +/- 0.15s de diferenca
+
+        // Show frozen exact LED digits
+        ledDigits.textContent = formatLed(elapsed);
+
+        if (won) {
+          playWinBuzzer();
+          ledStatus.textContent = 'GANHOU!';
+          ledStatus.className = 'led-status-line won';
+          const sign = elapsed >= targetSec ? '+' : '-';
+          ledSubinfo.textContent = `PRECISÃO MÁXIMA! DIFERENÇA: ${sign}${diff.toFixed(2)}s`;
+          ledSubinfo.className = 'led-subinfo won';
+        } else {
+          playLoseSound();
+          ledStatus.textContent = 'PERDEU!';
+          ledStatus.className = 'led-status-line lost';
+          const sign = elapsed >= targetSec ? '+' : '-';
+          ledSubinfo.textContent = `FORA DO TEMPO: ${sign}${diff.toFixed(2)}s (TOLERÂNCIA: ±0.15s)`;
+          ledSubinfo.className = 'led-subinfo';
+        }
+      }
+
+      function resetTimer() {
+        state = 'IDLE';
+        playRelayClick();
+
+        buzzerMainText.textContent = 'START';
+        buzzerSubText.textContent = 'BATER';
+
+        ledStatus.textContent = 'PRONTO';
+        ledStatus.className = 'led-status-line';
+        ledDigits.textContent = formatLed(targetSec);
+        ledSubinfo.textContent = 'TOQUE NO BOTÃO PARA INICIAR';
+        ledSubinfo.className = 'led-subinfo';
+
+        targetButtons.forEach(b => b.disabled = false);
+      }
+
+      // Initial LED display
+      ledDigits.textContent = formatLed(targetSec);
+    })();
+  </script>
+</body>
+</html>
